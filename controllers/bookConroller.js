@@ -1,0 +1,217 @@
+const Book = require('../models/Book');
+
+const getAllBooks = async (req, res) => {
+    try {
+        // Pagination and search parameters
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+        const { search } = req.query;
+
+        // Build the query object based on search parameters
+        let query = {};
+
+        if (search) {
+            // If a search term is provided, add a case-insensitive regex search for the title
+            query.title = { $regex: search, $options: 'i' };
+        }
+
+        // Count total documents for pagination
+        const total = await Book.countDocuments(query);
+        const books = await Book.find(query)
+            .populate("authors") 
+            .populate("borrowedBy")
+            .populate("issuedBy")
+            .skip(skip)
+            .limit(limit);
+        
+        // Filter results based on search term
+        let results = books;
+        if (search) {
+            results = books.filter((book) => {
+                // Perform a case-insensitive search on the title
+                const titleMatch = book.title.match(new RegExp(search, 'i'));
+                // Perform a case-insensitive search on the authors' names
+                const authorMatch = book.authors.some((a) => 
+                    a.name.match(new RegExp(search, 'i'))
+            );
+                // Return true if either the title or any of the authors match the search term
+                return titleMatch || authorMatch;
+            });
+        }
+
+        // Return paginated results along with pagination metadata
+        res.status(200).json({
+            page,
+            limit,
+            total,
+            // Calculate total pages based on total documents and limit
+            totalPages: Math.ceil(total / limit),
+            results
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+const getBookById = async (req, res) => {
+    try {
+        // Find the book by ID and populate related fields (authors, borrowedBy, issuedBy)
+        const book = await Book.findById(req.params.id)
+            .populate("authors")
+            .populate("borrowedBy")
+            .populate("issuedBy");
+
+        if (!book) {
+            return res.status(404).json({ message: "Book not found" });
+        }
+
+        // Determine if the book is overdue based on its status and return date
+        const isOverdue =
+            book.status === "OUT" &&
+            book.returnDate &&
+            // Check if the current date is past the return date to determine if the book is overdue
+            new Date() > new Date(book.returnDate);
+
+        const response = book.toObject();
+
+        // only include borrowedBy, issuedBy, returnDate if OUT
+        if (book.status === "IN") {
+            delete response.borrowedBy; // Remove borrowedBy field if the book is available
+            delete response.issuedBy; // Remove issuedBy field if the book is available
+            delete response.returnDate; // Remove returnDate field if the book is available
+        }
+
+        // Return the book details along with an isOverdue flag if the book is currently checked out
+        res.status(200).json({ ...response, isOverdue: isOverdue || false });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+const createBook = async (req, res) => {
+    try {
+        // Check if the request body contains an ISBN and if a book with that ISBN already exists to prevent duplicates
+        if (req.body.isbn) {
+            const existing = await Book.findOne({ isbn: req.body.isbn });
+            if (existing) {
+                return res.status(400).json({ message: "A book with this ISBN already exists" });
+            }
+        }
+
+        // Create a new book using the data from the request body and return the created book in the response
+        const book = await Book.create(req.body);
+        res.status(201).json({ message: "Book created successfully", book });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
+const updateBook = async (req, res) => {
+    try {
+        // Find the book by ID and update it with the data from the request body, returning the updated book in the response
+        const book = await Book.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        if (!book) {
+            return res.status(404).json({ message: "Book not found" });
+        }
+        res.status(200).json({ message: "Book updated successfully", book });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
+const deleteBook = async (req, res) => {
+    try {
+        // Find the book by ID and delete it, returning the deleted book in the response
+        const book = await Book.findByIdAndDelete(req.params.id);
+        if (!book) {
+            return res.status(404).json({ message: "Book not found" });
+        }
+        res.status(200).json({ message: "Book deleted successfully", book });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
+const  borrowBook = async (req, res) => {
+    try {
+        const  { studentId, attendantId, returnDate } = req.body;
+        const book = await Book.findById(req.params.id);
+        if (!book) {
+            return res.status(404).json({ message: "Book not found" });
+        }
+        if (book.status === "OUT") {
+            return res.status(400).json({ message: "Book is already borrowed" });
+        }
+
+        // Update the book's status to "OUT", set the borrowedBy field to the student's ID, set the issuedBy field to the attendant's ID, and set the returnDate field to the provided return date
+        book.status = "OUT";
+        book.borrowedBy = studentId;
+        book.issuedBy = attendantId;
+        book.returnDate = returnDate;
+        await book.save();
+
+        // Populate the authors, borrowedBy, and issuedBy fields of the book before returning it in the response to provide complete information about the book and its borrowing details
+        await book.populate("authors borrowedBy issuedBy");
+        res.status(200).json({ message: "Book borrowed successfully", book });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
+const returnBook = async (req, res) => {
+    try {
+        const book = await Book.findById(req.params.id);
+        if (!book) {
+            return res.status(404).json({ message: "Book not found" });
+        }
+        if (book.status === "IN") {
+            return res.status(400).json({ message: "Book is not currently borrowed" });
+        }
+
+        book.status = "IN"; // Update the book's status to "IN" to indicate that it is now available
+        book.borrowedBy = null; // Clear the borrowedBy field to indicate that no student is currently borrowing the book
+        book.issuedBy = null; // Clear the issuedBy field to indicate that no attendant is currently responsible for the book
+        book.returnDate = null; // Clear the returnDate field to indicate that there is no longer a due date for the book
+        await book.save();
+
+        res.status(200).json({ message: "Book returned successfully", book });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+
+};
+
+const getOverdueBooks = async (req, res) => {
+    try {
+        const overdueBooks = await Book.find({
+            // Find books that are currently checked out (status: "OUT") and have a return date that is in the past (returnDate < current date) to identify overdue books
+            status: "OUT",
+            returnDate: { $lt: new Date() } // Find books that are currently checked out and have a return date in the past
+        }).populate("authors borrowedBy issuedBy"); // Populate related fields to provide complete information about the overdue books
+        // Return the total number of overdue books and the list of overdue books in the response
+        res.status(200).json({ total: overdueBooks.length, overdueBooks });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
+module.exports = {
+    getAllBooks,
+    getBookById,
+    createBook,
+    updateBook,
+    deleteBook,
+    borrowBook,
+    returnBook,
+    getOverdueBooks
+};
+
+
+
+
+
+
+
+
+
