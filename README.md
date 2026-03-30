@@ -425,8 +425,13 @@ http://localhost:3000/api-docs
 ---
 
 ## Live Demo
+https://ts-library-api.onrender.com/api-docs/
+```
 
-Coming soon after deployment.
+**3 — Set up UptimeRobot:**
+Go to [uptimerobot.com](https://uptimerobot.com), create a free account and add a monitor for:
+```
+https://ts-library-api.onrender.com
 
 ---
 
