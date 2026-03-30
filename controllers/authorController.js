@@ -10,12 +10,19 @@ const createAuthor = async (req, res) => {
 };
 
 const getAllAuthors = async (req, res) => {
-    try {
-        const authors = await Author.find();
-        res.status(200).json({ message: "Authors retrieved successfully", authors });
-    } catch (error) {        
-        res.status(400).json({ error: error.message });
+  try {
+    const { search } = req.query;
+
+    let query = {};
+    if (search) {
+      query.name = { $regex: search, $options: "i" };
     }
+
+    const authors = await Author.find(query);
+    res.status(200).json({ message: "Authors retrieved successfully", authors });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 const getAuthorById = async (req, res) => {

@@ -1,0 +1,798 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "School Library Management API",
+    "version": "1.0.0",
+    "description": "A REST API for managing a school library system including books, authors, students and attendants"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Development server"
+    },
+    {
+      "url": "https://your-railway-app.up.railway.app",
+      "description": "Production server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Author": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Chinua Achebe"
+          },
+          "bio": {
+            "type": "string",
+            "example": "Nigerian novelist and poet"
+          }
+        }
+      },
+      "Book": {
+        "type": "object",
+        "required": ["title", "isbn", "authors"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Things Fall Apart"
+          },
+          "isbn": {
+            "type": "string",
+            "example": "978-0-385-47454-2"
+          },
+          "authors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": ["64f1a2b3c4d5e6f7a8b9c0d1"]
+          }
+        }
+      },
+      "Student": {
+        "type": "object",
+        "required": ["name", "email", "studentId"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "John Doe"
+          },
+          "email": {
+            "type": "string",
+            "example": "john@example.com"
+          },
+          "studentId": {
+            "type": "string",
+            "example": "STU001"
+          }
+        }
+      },
+      "Attendant": {
+        "type": "object",
+        "required": ["name", "staffId"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Jane Smith"
+          },
+          "staffId": {
+            "type": "string",
+            "example": "ATT001"
+          }
+        }
+      },
+      "BorrowBook": {
+        "type": "object",
+        "required": ["studentId", "attendantId", "returnDate"],
+        "properties": {
+          "studentId": {
+            "type": "string",
+            "example": "64f1a2b3c4d5e6f7a8b9c0d1"
+          },
+          "attendantId": {
+            "type": "string",
+            "example": "64f1a2b3c4d5e6f7a8b9c0d2"
+          },
+          "returnDate": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-04-01"
+          }
+        }
+      },
+      "Register": {
+        "type": "object",
+        "required": ["name", "email", "password", "role"],
+        "properties": {
+          "name": { "type": "string", "example": "John Doe" },
+          "email": { "type": "string", "example": "john@example.com" },
+          "password": { "type": "string", "example": "password123" },
+          "role": {
+            "type": "string",
+            "enum": ["Attendant", "Student"],
+            "example": "Student"
+          }
+        }
+      },
+      "Login": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "john@example.com"
+          },
+          "password": {
+            "type": "string",
+            "example": "password123"
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "summary": "Register a new user",
+        "tags": ["Auth"],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Register"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User registered successfully"
+          },
+          "400": {
+            "description": "Validation error or user already exists"
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "summary": "Login and get JWT token",
+        "tags": ["Auth"],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Login"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful, returns JWT token"
+          },
+          "401": {
+            "description": "Invalid email or password"
+          }
+        }
+      }
+    },
+    "/authors": {
+      "get": {
+        "summary": "Get all authors",
+        "tags": ["Authors"],
+        "responses": {
+          "200": {
+            "description": "List of authors retrieved successfully"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new author (attendants only)",
+        "tags": ["Authors"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Author"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Author created successfully"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Access denied, attendants only"
+          }
+        }
+      }
+    },
+    "/authors/{id}": {
+      "get": {
+        "summary": "Get a single author",
+        "tags": ["Authors"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Author ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Author retrieved successfully"
+          },
+          "404": {
+            "description": "Author not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update an author (attendants only)",
+        "tags": ["Authors"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Author ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Author"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Author updated successfully"
+          },
+          "403": {
+            "description": "Access denied, attendants only"
+          },
+          "404": {
+            "description": "Author not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete an author (attendants only)",
+        "tags": ["Authors"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Author ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Author deleted successfully"
+          },
+          "403": {
+            "description": "Access denied, attendants only"
+          },
+          "404": {
+            "description": "Author not found"
+          }
+        }
+      }
+    },
+    "/books": {
+      "get": {
+        "summary": "Get all books with pagination and search",
+        "tags": ["Books"],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Page number"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Number of books per page"
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search by title or author name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of books"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new book (attendants only)",
+        "tags": ["Books"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Book"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Book created successfully"
+          },
+          "400": {
+            "description": "Validation error or duplicate ISBN"
+          },
+          "403": {
+            "description": "Access denied, attendants only"
+          }
+        }
+      }
+    },
+    "/books/overdue": {
+      "get": {
+        "summary": "Get all overdue books (attendants only)",
+        "tags": ["Books"],
+        "responses": {
+          "200": {
+            "description": "List of overdue books"
+          },
+          "403": {
+            "description": "Access denied, attendants only"
+          }
+        }
+      }
+    },
+    "/books/{id}": {
+      "get": {
+        "summary": "Get a single book",
+        "tags": ["Books"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Book ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Book details with populated authors, student and attendant if OUT"
+          },
+          "404": {
+            "description": "Book not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a book (attendants only)",
+        "tags": ["Books"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Book ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Book"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Book updated successfully"
+          },
+          "403": {
+            "description": "Access denied, attendants only"
+          },
+          "404": {
+            "description": "Book not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a book (attendants only)",
+        "tags": ["Books"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Book ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Book deleted successfully"
+          },
+          "403": {
+            "description": "Access denied, attendants only"
+          },
+          "404": {
+            "description": "Book not found"
+          }
+        }
+      }
+    },
+    "/books/{id}/borrow": {
+      "post": {
+        "summary": "Borrow a book",
+        "tags": ["Books"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Book ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BorrowBook"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Book borrowed successfully"
+          },
+          "400": {
+            "description": "Book is already borrowed"
+          },
+          "404": {
+            "description": "Book not found"
+          }
+        }
+      }
+    },
+    "/books/{id}/return": {
+      "post": {
+        "summary": "Return a book",
+        "tags": ["Books"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Book ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Book returned successfully"
+          },
+          "400": {
+            "description": "Book is not currently borrowed"
+          },
+          "404": {
+            "description": "Book not found"
+          }
+        }
+      }
+    },
+    "/students": {
+      "get": {
+        "summary": "Get all students (attendants only)",
+        "tags": ["Students"],
+        "responses": {
+          "200": {
+            "description": "List of students retrieved successfully"
+          },
+          "403": {
+            "description": "Access denied, attendants only"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new student (attendants only)",
+        "tags": ["Students"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Student"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Student created successfully"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Access denied, attendants only"
+          }
+        }
+      }
+    },
+    "/students/{id}": {
+      "get": {
+        "summary": "Get a single student",
+        "tags": ["Students"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Student ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Student retrieved successfully"
+          },
+          "404": {
+            "description": "Student not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a student (own profile or attendant)",
+        "tags": ["Students"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Student ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Student"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Student updated successfully"
+          },
+          "404": {
+            "description": "Student not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a student (attendants only)",
+        "tags": ["Students"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Student ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Student deleted successfully"
+          },
+          "403": {
+            "description": "Access denied, attendants only"
+          },
+          "404": {
+            "description": "Student not found"
+          }
+        }
+      }
+    },
+    "/attendants": {
+      "get": {
+        "summary": "Get all attendants",
+        "tags": ["Attendants"],
+        "responses": {
+          "200": {
+            "description": "List of attendants retrieved successfully"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new attendant (attendants only)",
+        "tags": ["Attendants"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Attendant"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Attendant created successfully"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Access denied, attendants only"
+          }
+        }
+      }
+    },
+    "/attendants/{id}": {
+      "get": {
+        "summary": "Get a single attendant",
+        "tags": ["Attendants"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Attendant ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Attendant retrieved successfully"
+          },
+          "404": {
+            "description": "Attendant not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update an attendant (attendants only)",
+        "tags": ["Attendants"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Attendant ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Attendant"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Attendant updated successfully"
+          },
+          "403": {
+            "description": "Access denied, attendants only"
+          },
+          "404": {
+            "description": "Attendant not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete an attendant (attendants only)",
+        "tags": ["Attendants"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Attendant ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Attendant deleted successfully"
+          },
+          "403": {
+            "description": "Access denied, attendants only"
+          },
+          "404": {
+            "description": "Attendant not found"
+          }
+        }
+      }
+    }
+  }
+}
